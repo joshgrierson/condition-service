@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "es6",
+        "module": "commonjs",
+        "removeComments": true,
+        "allowSyntheticDefaultImports": true,
+        "experimentalDecorators": true,
+        "esModuleInterop": true,
+        "sourceMap": true,
+        "types": ["node"],
+        "lib": ["es2015", "es2016", "ES2015.Promise"],
+        "baseUrl": "./app"
+    },
+    "include": [
+        "app/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
