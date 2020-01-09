@@ -2,7 +2,7 @@ import { Service, ServiceError, ServiceStatus, Condition, ConditionType } from "
 import { Redis, BooleanResponse } from "ioredis";
 import hash from "object-hash";
 
-export default class ConditionService extends Service<Condition> {
+export default class ConditionService extends Service<Condition[]> {
     private redis: Redis;
 
     public constructor() {
@@ -12,44 +12,60 @@ export default class ConditionService extends Service<Condition> {
         });
     }
 
-    public async exec(payload: Condition, redis: Redis): Promise<any> {
+    public async exec(payload: Condition[], redis: Redis): Promise<any> {
         this.redis = redis;
 
         this.log(`Finding product[${this.data}] in redis...`);
 
         const match: {[key: string]: any} = await this.redis.hgetall(`${this.domain}:${this.data}`);
 
-        if (match) {
-            if (payload.type === ConditionType.location) {
-                const latlng: string[] = payload.value.split(",");
-                const hash: string = await this.insertLocationCondition(latlng[0], latlng[1], match["uid"]);
+        if (match && payload && payload.length > 0) {
+            const redisP: any[] = (payload.map(p => {
+                if (p.type === ConditionType.location) {
+                    return ["hset", ...this.prepLocationData(p.value, match["uid"])];
+                }
+            }) as []);
 
-                this.log(`Inserted ${ConditionType.location} condition, against entity '${this.data}'`);
+            const results: {} = await this.redis.pipeline(redisP).exec()
+                .then(results => this.formatResults(payload, results, match["uid"]));
 
-                this.redisSave(this.redis, hash);
-
-                return {
-                    lat: latlng[0],
-                    lng: latlng[1],
-                    uuid: match["uid"]
-                };
+            if (results && Object.keys(results).filter(k => results[k].status).length === Object.keys(results).length) {
+                throw new ServiceError(JSON.stringify(results));
             }
 
-            return match;
+            return results??Promise.resolve(payload);
         } else {
             throw new ServiceError(`Product with key '${this.domain}:${this.data}' not found in cache`, ServiceStatus.NotFound);
         }
     }
 
-    private async insertLocationCondition(lat: string, lng: string, uuid: string): Promise<any> {
-        const hashLatLng: string = hash([this.domain, lat, lng]);
-        
-        const insert: BooleanResponse = await this.redis.hset(hashLatLng, uuid, this.data);
+    private async formatResults(payload: Array<Condition>, results: Array<[Error, any]>, uuid: string): Promise<{}> {
+        return Promise.resolve(results.reduce((acc, result, idx) => {
+            const c: Condition = payload[idx];
 
-        if (insert > 0) {
-            return Promise.resolve(hashLatLng);
-        } else {
-            throw new ServiceError(`Failed to insert location '${lat},${lng}' under domain ${this.domain}`);
-        }
+            if (result[0] || result[1] === 0) {
+                acc[`${this.domain}:${c.type}`] = {
+                    status: "failed",
+                    err: result[0] ? result[0] : "Could not insert condition"
+                };
+            } else if (result[1] && result[1] > 0) {
+                const latlng: string[] = c.value.split(",");
+
+                acc[`${this.domain}:${c.type}`] = {
+                    lat: latlng[0],
+                    lng: latlng[1],
+                    uuid
+                }
+            }
+
+            return acc;
+        }, {}));
+    }
+
+    private prepLocationData(value: string, uuid: string): [string, string, string] {
+        const latlng: string[] = value.split(",");
+        const hashLatLng: string = hash([this.domain, latlng[0], latlng[1]]);
+
+        return [hashLatLng, uuid, this.data];
     }
 }

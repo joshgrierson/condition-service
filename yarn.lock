@@ -521,7 +521,7 @@ setprototypeof@1.1.1:
 
 "share@git+ssh://git@bitbucket.org:encreddesign/share.git":
   version "1.0.0"
-  resolved "git+ssh://git@bitbucket.org:encreddesign/share.git#208daee708d0c534d8bfbcedad2ca3b2a1c08f9e"
+  resolved "git+ssh://git@bitbucket.org:encreddesign/share.git#3d23a69f082491aecb5d87623730ae679a23e1c8"
   dependencies:
     "@types/express" "^4.17.2"
     "@types/ioredis" "^4.14.3"

@@ -14,7 +14,7 @@ export default class ConditionController extends Controller {
     }
 
     private exec(): void {
-        const service: Service<Condition> = this.getService();
+        const service: Service<Condition[]> = this.getService();
 
         service.setDomain("test.myshopify.com");
         service.setData(this.productId);
@@ -25,15 +25,17 @@ export default class ConditionController extends Controller {
             .catch(err => this.sendResponse(err, (this.args.req.method as ServiceMethod)));
     }
 
-    private async validateBody(service: Service<Condition>): Promise<any> {
-        const body: Condition = this.args.req.body;
+    private async validateBody(service: Service<Condition[]>): Promise<any> {
+        const body: Condition[] = this.args.req.body;
 
-        if (!body || !service.validateSchema(body)) {
+        if (!body || !Array.isArray(body)) {
+            throw new ServiceError(`Post body requires array with schema [${Object.keys(service.schema).join()}]`, ServiceStatus.NotAcceptable);
+        } else if (body && Array.isArray(body) && !service.validateSchema(body[0])) {
             throw new ServiceError(`Invalid entity schema, requires schema [${Object.keys(service.schema).join()}]`, ServiceStatus.NotAcceptable);
-        } else if (!ConditionType[body.type]) {
+        } else if (body.filter(e => ConditionType[e.type]).length === 0) {
             throw new ServiceError(`Field 'type' must be one of types [${Object.keys(ConditionType).join()}]`, ServiceStatus.NotAcceptable);
-        } else if (!this.isValidValue(body.type, body.value)) {
-            throw new ServiceError(`Field 'value' is invalid with type '${body.type}'`);
+        } else if (body.filter(e => this.isValidValue(e.type, e.value)).length === 0) {
+            throw new ServiceError(`Field 'value' is invalid with type '${body.find(e => !this.isValidValue(e.type, e.value)).type}'`);
         }
 
         return Promise.resolve();
