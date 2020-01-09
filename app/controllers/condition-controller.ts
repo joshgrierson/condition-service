@@ -14,7 +14,7 @@ export default class ConditionController extends Controller {
     }
 
     private exec(): void {
-        const service: Service = this.getService();
+        const service: Service<Condition> = this.getService();
 
         service.setDomain("test.myshopify.com");
         service.setData(this.productId);
@@ -25,15 +25,26 @@ export default class ConditionController extends Controller {
             .catch(err => this.sendResponse(err, (this.args.req.method as ServiceMethod)));
     }
 
-    private async validateBody(service: Service): Promise<any> {
+    private async validateBody(service: Service<Condition>): Promise<any> {
         const body: Condition = this.args.req.body;
 
         if (!body || !service.validateSchema(body)) {
             throw new ServiceError(`Invalid entity schema, requires schema [${Object.keys(service.schema).join()}]`, ServiceStatus.NotAcceptable);
         } else if (!ConditionType[body.type]) {
             throw new ServiceError(`Field 'type' must be one of types [${Object.keys(ConditionType).join()}]`, ServiceStatus.NotAcceptable);
+        } else if (!this.isValidValue(body.type, body.value)) {
+            throw new ServiceError(`Field 'value' is invalid with type '${body.type}'`);
         }
 
         return Promise.resolve();
+    }
+
+    private isValidValue(type: ConditionType, value: string): boolean {
+        if (value && type === ConditionType.location) {
+            const latlng: string[] = value.trim().split(",");
+            return !isNaN(parseInt(latlng[0])) && latlng[1] && !isNaN(parseInt(latlng[1]));
+        }
+
+        return false;
     }
 }
