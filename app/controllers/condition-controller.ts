@@ -2,6 +2,7 @@ import { Controller, Service, Condition, ServiceError, ServiceStatus, ServiceMet
 import { Request, Response, NextFunction } from "express";
 import { Redis } from "ioredis";
 import ConditionService from "../services/condition-service";
+import Helper from "../helper";
 
 export default class ConditionController extends Controller {
     private productId: string;
@@ -43,8 +44,9 @@ export default class ConditionController extends Controller {
 
     private isValidValue(type: ConditionType, value: string): boolean {
         if (value && type === ConditionType.location) {
-            const latlng: string[] = value.trim().split(",");
-            return !isNaN(parseInt(latlng[0])) && latlng[1] && !isNaN(parseInt(latlng[1]));
+            const {lat, lng, radius} = Helper.formatLocationData(value);
+
+            return !isNaN(parseInt(lat)) && lng && !isNaN(parseInt(lng)) && (radius === undefined ? true : !isNaN(parseInt(radius)));
         }
 
         return false;

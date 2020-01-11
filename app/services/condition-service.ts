@@ -1,6 +1,7 @@
 import { Service, ServiceError, ServiceStatus, Condition, ConditionType } from "share";
-import { Redis, BooleanResponse } from "ioredis";
+import { Redis } from "ioredis";
 import hash from "object-hash";
+import Helper from "../helper";
 
 export default class ConditionService extends Service<Condition[]> {
     private redis: Redis;
@@ -33,6 +34,8 @@ export default class ConditionService extends Service<Condition[]> {
                 throw new ServiceError(JSON.stringify(results));
             }
 
+            this.log(`Inserted condition ${JSON.stringify(results)}`);
+
             return results??Promise.resolve(payload);
         } else {
             throw new ServiceError(`Product with key '${this.domain}:${this.data}' not found in cache`, ServiceStatus.NotFound);
@@ -49,13 +52,14 @@ export default class ConditionService extends Service<Condition[]> {
                     err: result[0] ? result[0] : "Could not insert condition"
                 };
             } else if (result[1] && result[1] > 0) {
-                const latlng: string[] = c.value.split(",");
+                const {lat, lng, radius} = Helper.formatLocationData(c.value);
+                const res: any = {lat, lng, uuid};
 
-                acc[`${this.domain}:${c.type}`] = {
-                    lat: latlng[0],
-                    lng: latlng[1],
-                    uuid
+                if (radius) {
+                    res.radius = radius;
                 }
+
+                acc[`${this.domain}:${c.type}`] = res;
             }
 
             return acc;
@@ -63,9 +67,14 @@ export default class ConditionService extends Service<Condition[]> {
     }
 
     private prepLocationData(value: string, uuid: string): [string, string, string] {
-        const latlng: string[] = value.split(",");
-        const hashLatLng: string = hash([this.domain, latlng[0], latlng[1]]);
+        const {lat, lng, radius} = Helper.formatLocationData(value);
 
-        return [hashLatLng, uuid, this.data];
+        const arr: string[] = [this.domain, lat, lng];
+
+        if (radius) {
+            arr.push(radius);
+        }
+
+        return [hash(arr), uuid, this.data];
     }
 }
